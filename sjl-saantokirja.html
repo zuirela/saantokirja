@@ -828,6 +828,16 @@
     <div class="home-parts" id="home-parts"></div>
   </div>
 
+  <!-- PART VIEW -->
+  <div id="part-view" style="display:none;">
+    <div class="rule-header">
+      <div class="rule-breadcrumb" onclick="showHome()">← Etusivu</div>
+      <div class="rule-num-badge" id="part-view-badge">OSA 1</div>
+      <div class="rule-title" id="part-view-title">PELIALUE</div>
+    </div>
+    <div class="rule-body" id="part-view-body"></div>
+  </div>
+
   <!-- RULE VIEW -->
   <div id="rule-view">
     <div class="rule-header">
@@ -965,12 +975,91 @@ function buildHome() {
 
 function openPartRules(partNum) {
   const part = DB.parts.find(p => p.number === partNum);
-  if (part && part.rules.length > 0) {
-    openRule(part.rules[0]);
-    // Expand nav part
-    const navPart = document.getElementById('nav-part-' + partNum);
-    if (navPart) navPart.classList.add('expanded');
-  }
+  if (!part) return;
+
+  document.getElementById('part-view-badge').textContent = 'OSA ' + part.number;
+  document.getElementById('part-view-title').textContent = part.title;
+
+  let html = '';
+  part.rules.forEach(ruleNum => {
+    const rule = DB.rules[ruleNum];
+    if (!rule) return;
+    const sitCount = (DB.situations[ruleNum] || []).length;
+    html += `<div class="section-card" id="rule-card-${ruleNum}">
+      <div class="section-header" onclick="toggleRuleCard('${ruleNum}')">
+        <span class="section-id">SÄÄNTÖ ${ruleNum}</span>
+        <span class="section-title">${rule.title}</span>
+        ${sitCount > 0 ? `<span class="situations-count" style="margin-right:6px;">${sitCount}</span>` : ''}
+        <span class="section-chevron">▼</span>
+      </div>
+      <div class="section-content" id="rule-card-body-${ruleNum}" style="display:none; padding:0;">
+        ${rule.sections.map(sec => `
+          <div class="section-card" style="margin:8px 12px; border-radius:8px;" id="sec2-${sec.id.replace('.','_')}">
+            <div class="section-header" onclick="toggleSection2('${sec.id.replace('.','_')}')">
+              <span class="section-id">${sec.id}</span>
+              <span class="section-title">${sec.title}</span>
+              <span class="section-chevron">▼</span>
+            </div>
+            <div class="section-content" id="sec2-body-${sec.id.replace('.','_')}" style="display:none;">${escHtml(sec.content)}</div>
+          </div>`).join('')}
+        ${(DB.situations[ruleNum] || []).length > 0 ? `
+          <div class="situations-section" style="margin:8px 12px 12px;">
+            <div class="situations-header">
+              <span class="situations-label">Tilannekäsikirja</span>
+              <span class="situations-count">${(DB.situations[ruleNum]).length} tilannetta</span>
+            </div>
+            ${(DB.situations[ruleNum]).map(sit => `
+              <div class="situation-card" id="sit2-${sit.id.replace('.','_')}">
+                <div class="situation-q-header" onclick="toggleSituation2('${sit.id.replace('.','_')}')">
+                  <span class="situation-num">${sit.id}</span>
+                  <span class="situation-q-text">${escHtml(sit.question)}</span>
+                  <span class="situation-chevron">▼</span>
+                </div>
+                <div class="situation-answer" id="sit2-ans-${sit.id.replace('.','_')}" style="display:none;">
+                  <div class="situation-answer-label">Vastaus</div>
+                  <div class="situation-answer-text">${escHtml(sit.answer)}</div>
+                </div>
+              </div>`).join('')}
+          </div>` : ''}
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('part-view-body').innerHTML = html;
+  setView('part');
+  window.scrollTo(0, 0);
+  if (window.innerWidth < 768) closeSidebar();
+
+  // Expand nav part
+  const navPart = document.getElementById('nav-part-' + partNum);
+  if (navPart) navPart.classList.add('expanded');
+}
+
+function toggleRuleCard(ruleNum) {
+  const body = document.getElementById('rule-card-body-' + ruleNum);
+  const card = document.getElementById('rule-card-' + ruleNum);
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  card.classList.toggle('expanded', !isOpen);
+}
+
+function toggleSection2(id) {
+  const body = document.getElementById('sec2-body-' + id);
+  const card = document.getElementById('sec2-' + id);
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  card.classList.toggle('expanded', !isOpen);
+}
+
+function toggleSituation2(id) {
+  const ans = document.getElementById('sit2-ans-' + id);
+  const card = document.getElementById('sit2-' + id);
+  if (!ans) return;
+  const isOpen = ans.style.display !== 'none';
+  ans.style.display = isOpen ? 'none' : 'block';
+  card.classList.toggle('expanded', !isOpen);
 }
 
 // ─── RULE VIEW ───
@@ -1228,6 +1317,7 @@ function highlightText(text, query) {
 function setView(view) {
   currentView = view;
   document.getElementById('home-view').style.display = view === 'home' ? 'block' : 'none';
+  document.getElementById('part-view').style.display = view === 'part' ? 'block' : 'none';
   document.getElementById('rule-view').style.display = view === 'rule' ? 'block' : 'none';
   document.getElementById('search-view').style.display = view === 'search' ? 'block' : 'none';
   
@@ -1291,6 +1381,7 @@ function setupEvents() {
   });
   
   document.getElementById('rule-back').addEventListener('click', () => {
+    // Go back to home (nav handles part context)
     setView('home');
     window.scrollTo(0,0);
   });
