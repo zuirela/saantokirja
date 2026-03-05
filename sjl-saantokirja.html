@@ -306,12 +306,13 @@
     gap: 8px;
   }
   .home-part-drag {
-    font-size: 1.1rem;
-    color: var(--border);
+    font-size: 1.4rem;
+    color: var(--text-muted);
     cursor: grab;
-    padding: 0 4px;
+    padding: 8px 4px 8px 12px;
     flex-shrink: 0;
     user-select: none;
+    touch-action: none;
   }
   .home-part-card.drag-over {
     border-color: var(--blue-light);
@@ -983,13 +984,12 @@ function buildHome() {
       const ruleCount = part.rules.length;
       const sitCount = part.rules.reduce((n,r) => n + (DB.situations[r]?.length||0), 0);
       html += `<div class="home-part-card" draggable="true" data-part="${part.number}" onclick="openPartRules('${part.number}')">
-        <div class="home-part-drag" title="Järjestä">⠿</div>
         <div class="home-part-icon">${icons[idx]||'📄'}</div>
         <div class="home-part-info">
           <div class="home-part-name" style="display:flex;align-items:baseline;gap:8px;"><span style="flex:1;">${part.title}</span><span style="font-size:0.72rem;font-weight:400;color:var(--text-muted);white-space:nowrap;">OSA ${part.number}</span></div>
           <div class="home-part-meta">${ruleCount} sääntöä · ${sitCount} tilannetta</div>
         </div>
-        <span class="home-part-arrow">›</span>
+        <div class="home-part-drag" title="Järjestä">⠿</div>
       </div>`;
     });
     container.innerHTML = html;
@@ -1030,6 +1030,45 @@ function buildHome() {
         partOrder.splice(toIdx, 0, partOrder.splice(fromIdx, 1)[0]);
         localStorage.setItem('sjl_part_order', JSON.stringify(partOrder));
         renderHomeParts();
+      });
+
+      // Touch support
+      const handle = card.querySelector('.home-part-drag');
+      if (!handle) return;
+      let touchDragSrc = null;
+      let placeholder = null;
+
+      handle.addEventListener('touchstart', e => {
+        e.stopPropagation();
+        touchDragSrc = card;
+        card.style.opacity = '0.5';
+      }, { passive: true });
+
+      handle.addEventListener('touchmove', e => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        const target = el ? el.closest('.home-part-card') : null;
+        container.querySelectorAll('.home-part-card').forEach(c => c.classList.remove('drag-over'));
+        if (target && target !== touchDragSrc) target.classList.add('drag-over');
+      }, { passive: false });
+
+      handle.addEventListener('touchend', e => {
+        e.stopPropagation();
+        card.style.opacity = '1';
+        const touch = e.changedTouches[0];
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        const target = el ? el.closest('.home-part-card') : null;
+        container.querySelectorAll('.home-part-card').forEach(c => c.classList.remove('drag-over'));
+        if (target && target !== touchDragSrc) {
+          const allCards = [...container.querySelectorAll('.home-part-card')];
+          const fromIdx = allCards.indexOf(touchDragSrc);
+          const toIdx = allCards.indexOf(target);
+          partOrder.splice(toIdx, 0, partOrder.splice(fromIdx, 1)[0]);
+          localStorage.setItem('sjl_part_order', JSON.stringify(partOrder));
+          renderHomeParts();
+        }
+        touchDragSrc = null;
       });
     });
   }
