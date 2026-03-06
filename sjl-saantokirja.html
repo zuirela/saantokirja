@@ -1346,6 +1346,21 @@ function toggleRuleCard(ruleNum) {
   const isOpen = body.style.display !== 'none';
   body.style.display = isOpen ? 'none' : 'block';
   card.classList.toggle('expanded', !isOpen);
+  // Auto-expand first subsection if its title matches rule title
+  if (!isOpen) {
+    const rule = DB.rules[ruleNum];
+    if (rule && rule.sections.length > 0) {
+      const firstSec = rule.sections[0];
+      if (firstSec.title.trim().toUpperCase() === rule.title.trim().toUpperCase()) {
+        const secBody = document.getElementById('sec2-body-' + firstSec.id.replace('.','_'));
+        const secCard = document.getElementById('sec2-' + firstSec.id.replace('.','_'));
+        if (secBody && secBody.style.display === 'none') {
+          secBody.style.display = 'block';
+          if (secCard) secCard.classList.add('expanded');
+        }
+      }
+    }
+  }
 }
 
 function toggleSection2(id) {
@@ -1485,6 +1500,15 @@ function openRule(ruleNum) {
   }
   
   document.getElementById('rule-body').innerHTML = bodyHTML;
+  
+  // Auto-expand first subsection if its title matches the rule title
+  if (rule.sections.length > 0) {
+    const firstSec = rule.sections[0];
+    if (firstSec.title.trim().toUpperCase() === rule.title.trim().toUpperCase()) {
+      const secEl = document.getElementById('sec-' + firstSec.id);
+      if (secEl) secEl.classList.add('expanded');
+    }
+  }
   
   // Show rule view
   setView('rule');
