@@ -365,6 +365,36 @@
     font-size: 0.9rem;
   }
 
+  /* ─── FAVORITES ─── */
+  .fav-section { margin-bottom: 20px; }
+  .fav-section-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.78rem; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 10px; padding: 0 2px;
+  }
+  .fav-section-icon { display: flex; align-items: center; }
+  .fav-empty {
+    text-align: center; padding: 18px 16px;
+    font-size: 0.76rem; color: var(--text-muted);
+    background: rgba(0,46,109,0.03); border-radius: 10px;
+    border: 1px dashed var(--border);
+  }
+  .fav-star-btn {
+    background: none; border: none; cursor: pointer;
+    padding: 4px 6px; display: flex; align-items: center;
+    flex-shrink: 0; transition: transform 0.15s;
+  }
+  .fav-star-btn:hover { transform: scale(1.2); }
+  .fav-star-btn svg { width: 18px; height: 18px; }
+  .fav-star-btn .star-outline { color: #b8cce0; }
+  .fav-star-btn .star-filled { color: #D4A843; display: none; }
+  .fav-star-btn.active .star-outline { display: none; }
+  .fav-star-btn.active .star-filled { display: block; }
+  .fav-divider {
+    height: 1px; background: var(--border); margin: 6px 0 16px; opacity: 0.5;
+  }
+
   /* ─── RULE VIEW ─── */
   #rule-view {
     display: none;
@@ -818,6 +848,14 @@
       <div id="home-search-info" style="font-size:0.75rem;color:var(--text-muted);padding:8px 18px 2px;"></div>
       <div id="home-search-results" style="padding-bottom:8px;"></div>
     </div>
+    <div id="fav-section" class="fav-section" style="display:none;">
+      <div class="fav-section-title">
+        <span class="fav-section-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7L12 2z" fill="#D4A843" stroke="#D4A843" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
+        Suosikit
+      </div>
+      <div id="fav-items" class="home-parts"></div>
+      <div class="fav-divider"></div>
+    </div>
     <div class="home-parts" id="home-parts"></div>
     <button id="reset-order-btn" style="display:none;align-items:center;gap:8px;margin:16px auto 0;background:rgba(0,46,109,0.08);border:1px solid var(--border);border-radius:20px;padding:8px 18px;color:var(--text-muted);font-size:0.72rem;cursor:pointer;font-family:Arial,sans-serif;">
       ↺ Palauta alkuperäinen järjestys
@@ -933,6 +971,108 @@ function togglePart(num) {
 // ─── HOME ───
 function buildHome() {
   const container = document.getElementById('home-parts');
+
+  // ─── Favorites ───
+  window.favorites = JSON.parse(localStorage.getItem('sjl_favorites') || '[]');
+  window.favOrder = JSON.parse(localStorage.getItem('sjl_fav_order') || '[]');
+  // Clean stale entries
+  favorites = favorites.filter(id => {
+    const [type, num] = id.split(':');
+    if (type === 'rule') return !!DB.rules[num];
+    if (type === 'sec') return Object.values(DB.rules).some(r => r.sections.some(s => s.id === num));
+    return false;
+  });
+  favOrder = favOrder.filter(id => favorites.includes(id));
+  favorites.forEach(id => { if (!favOrder.includes(id)) favOrder.push(id); });
+
+  window.toggleFavorite = function(favId, ev) {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    const idx = favorites.indexOf(favId);
+    if (idx >= 0) {
+      favorites.splice(idx, 1);
+      favOrder = favOrder.filter(id => id !== favId);
+    } else {
+      favorites.push(favId);
+      favOrder.push(favId);
+    }
+    localStorage.setItem('sjl_favorites', JSON.stringify(favorites));
+    localStorage.setItem('sjl_fav_order', JSON.stringify(favOrder));
+    renderFavorites();
+    // Update star buttons everywhere
+    document.querySelectorAll('.fav-star-btn').forEach(btn => {
+      btn.classList.toggle('active', favorites.includes(btn.dataset.fav));
+    });
+  };
+
+  window.renderFavorites = function() {
+    const favSection = document.getElementById('fav-section');
+    const favItems = document.getElementById('fav-items');
+    if (favOrder.length === 0) {
+      favSection.style.display = 'none';
+      return;
+    }
+    favSection.style.display = 'block';
+    let html = '';
+    favOrder.forEach(favId => {
+      const [type, num] = favId.split(':');
+      let title = '', badge = '', clickFn = '';
+      if (type === 'rule' && DB.rules[num]) {
+        title = DB.rules[num].title;
+        badge = 'SÄÄNTÖ ' + num;
+        clickFn = `openRule('${num}')`;
+      } else if (type === 'sec') {
+        for (const r of Object.values(DB.rules)) {
+          const sec = r.sections.find(s => s.id === num);
+          if (sec) { title = sec.title; badge = num; clickFn = `openRule('${r.number}');setTimeout(()=>{const el=document.getElementById('sec-${num}');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},200)`; break; }
+        }
+      }
+      if (!title) return;
+      html += `<div class="home-part-card" draggable="true" data-fav="${favId}" onclick="${clickFn}" style="padding:10px 14px;">
+        <div class="home-part-icon" style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#D4A843 0%,#b8912e 100%);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7L12 2z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="home-part-info">
+          <div class="home-part-name" style="font-size:0.8rem;">${title}</div>
+          <div class="home-part-meta">${badge}</div>
+        </div>
+        <button class="fav-star-btn active" data-fav="${favId}" onclick="toggleFavorite('${favId}',event)" title="Poista suosikeista">
+          <svg class="star-filled" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7L12 2z" fill="#D4A843" stroke="#D4A843" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          <svg class="star-outline" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7L12 2z" stroke="#b8cce0" stroke-width="1.5" stroke-linejoin="round" fill="none"/></svg>
+        </button>
+      </div>`;
+    });
+    favItems.innerHTML = html;
+    // Setup fav drag-drop
+    setupFavDragDrop();
+  };
+
+  function setupFavDragDrop() {
+    const favContainer = document.getElementById('fav-items');
+    const cards = favContainer.querySelectorAll('.home-part-card');
+    let dragSrc = null;
+    cards.forEach(card => {
+      card.addEventListener('dragstart', e => { dragSrc = card; card.style.opacity = '0.4'; e.dataTransfer.effectAllowed = 'move'; });
+      card.addEventListener('dragend', () => { card.style.opacity = '1'; favContainer.querySelectorAll('.home-part-card').forEach(c => c.classList.remove('drag-over')); });
+      card.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; favContainer.querySelectorAll('.home-part-card').forEach(c => c.classList.remove('drag-over')); if (card !== dragSrc) card.classList.add('drag-over'); });
+      card.addEventListener('drop', e => {
+        e.preventDefault(); e.stopPropagation();
+        if (dragSrc === card) return;
+        const allCards = [...favContainer.querySelectorAll('.home-part-card')];
+        const fromIdx = allCards.indexOf(dragSrc); const toIdx = allCards.indexOf(card);
+        favOrder.splice(toIdx, 0, favOrder.splice(fromIdx, 1)[0]);
+        localStorage.setItem('sjl_fav_order', JSON.stringify(favOrder));
+        renderFavorites();
+      });
+    });
+  }
+
+  window.favStarHTML = function(favId) {
+    const isActive = favorites.includes(favId);
+    return `<button class="fav-star-btn ${isActive ? 'active' : ''}" data-fav="${favId}" onclick="toggleFavorite('${favId}',event)" title="${isActive ? 'Poista suosikeista' : 'Lisää suosikiksi'}">
+      <svg class="star-filled" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7L12 2z" fill="#D4A843" stroke="#D4A843" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      <svg class="star-outline" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7L12 2z" stroke="#b8cce0" stroke-width="1.5" stroke-linejoin="round" fill="none"/></svg>
+    </button>`;
+  };
   const icons = [
     /* 0: OSA 1 PELIALUE */ '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="5" width="22" height="18" rx="5" stroke="white" stroke-width="1.8" fill="none"/><line x1="14" y1="5" x2="14" y2="23" stroke="white" stroke-width="1.2"/><circle cx="14" cy="14" r="3.5" stroke="white" stroke-width="1.2"/></svg>',
     /* 1: OSA 2 JOUKKUEET */ '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="9" cy="8" r="3.5" stroke="white" stroke-width="1.6" fill="none"/><path d="M2 24c0-4 3-7 7-7s7 3 7 7" stroke="white" stroke-width="1.6" fill="none" stroke-linecap="round"/><circle cx="19" cy="8" r="3.5" stroke="white" stroke-width="1.6" fill="none"/><path d="M12 24c0-4 3-7 7-7s7 3 7 7" stroke="white" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>',
@@ -945,7 +1085,7 @@ function buildHome() {
     /* 8: OSA 9 MUUT RIKKEET */ '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><line x1="4" y1="7" x2="16" y2="7" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="4" y1="14" x2="16" y2="14" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="4" y1="21" x2="16" y2="21" stroke="white" stroke-width="2" stroke-linecap="round"/><circle cx="22" cy="14" r="5" stroke="white" stroke-width="1.8" fill="none"/><line x1="22" y1="10.5" x2="22" y2="14.5" stroke="white" stroke-width="2" stroke-linecap="round"/><circle cx="22" cy="17" r="1" fill="white"/></svg>',
     /* 9: OSA 10 PELIN VIRTAUS */ '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="9" cy="14" r="5" stroke="white" stroke-width="1.8" fill="none"/><line x1="7" y1="14" x2="11" y2="14" stroke="white" stroke-width="1.5"/><line x1="9" y1="12" x2="9" y2="16" stroke="white" stroke-width="1.5"/><path d="M17 8l7 6-7 6" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
     /* 10: OSA 11 NAISTEN JÄÄKIEKKO */ '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="9.5" r="6.5" stroke="white" stroke-width="2" fill="none"/><line x1="14" y1="16" x2="14" y2="26" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="10" y1="21.5" x2="18" y2="21.5" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>',
-    /* 11: OSA 12 ERITYISSÄÄNNÖT */ '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 3l3.5 7H25l-6 5 2.5 7.5L14 18l-7.5 4.5L9 15l-6-5h7.5L14 3z" stroke="white" stroke-width="1.8" fill="none" stroke-linejoin="round"/></svg>'
+    /* 11: OSA 12 ERITYISSÄÄNNÖT */ '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="10" stroke="white" stroke-width="1.8" fill="none"/><text x="14" y="19.5" text-anchor="middle" fill="white" font-size="16" font-weight="bold" font-family="serif">§</text></svg>'
   ];
   window.defaultOrder = DB.parts.map(p => p.number);
   window.partOrder = JSON.parse(localStorage.getItem('sjl_part_order') || 'null') || defaultOrder;
@@ -1052,6 +1192,7 @@ function buildHome() {
   }
 
   renderHomeParts();
+  renderFavorites();
 
   document.getElementById('reset-order-btn').addEventListener('click', e => {
     e.stopPropagation();
@@ -1083,6 +1224,7 @@ function openPartRules(partNum) {
         <span class="section-id">SÄÄNTÖ ${ruleNum}</span>
         <span class="section-title">${rule.title}</span>
         ${sitCount > 0 ? `<span class="situations-count" style="margin-right:6px;">${sitCount}</span>` : ''}
+        ${window.favStarHTML ? window.favStarHTML('rule:'+ruleNum) : ''}
         <span class="section-chevron">▼</span>
       </div>
       <div class="section-content" id="rule-card-body-${ruleNum}" style="display:none; padding:0;">
@@ -1177,6 +1319,14 @@ function openRule(ruleNum) {
   // Update header
   document.getElementById('rule-badge').textContent = 'SÄÄNTÖ ' + ruleNum;
   document.getElementById('rule-title').textContent = rule.title;
+  // Add fav star to rule header
+  let ruleStarContainer = document.getElementById('rule-header-star');
+  if (!ruleStarContainer) {
+    ruleStarContainer = document.createElement('span');
+    ruleStarContainer.id = 'rule-header-star';
+    document.getElementById('rule-title').parentNode.appendChild(ruleStarContainer);
+  }
+  ruleStarContainer.innerHTML = window.favStarHTML ? window.favStarHTML('rule:'+ruleNum) : '';
   
   // Prev/Next
   const idx = allRuleNums.indexOf(ruleNum);
@@ -1213,6 +1363,7 @@ function openRule(ruleNum) {
         <div class="section-header" onclick="toggleSection('${sec.id.replace('.','_')}')">
           <span class="section-id">${sec.id}</span>
           <span class="section-title">${sec.title}</span>
+          ${window.favStarHTML ? window.favStarHTML('sec:'+sec.id) : ''}
           <span class="section-chevron">▼</span>
         </div>
         <div class="section-content">${escHtml(sec.content)}</div>
