@@ -328,9 +328,9 @@
     pointer-events: none;
     box-shadow: 0 8px 32px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10);
     border-radius: 12px;
-    transform: scale(1.03);
-    opacity: 0.92;
+    opacity: 0.95;
     transition: none;
+    will-change: top;
   }
   .drop-indicator {
     height: 3px;
@@ -997,22 +997,25 @@ function togglePart(num) {
 // ─── REUSABLE LIST DRAG ───
 function initListDrag(listEl, cardSel, handleSel, onReorder) {
   let srcCard = null, ghost = null, indicator = null, srcIdx = -1, curIdx = -1;
+  let ghostOffY = 0, listRect = null;
 
-  function getCards() { return [...listEl.querySelectorAll(cardSel)]; }
+  function getCards() { return [...listEl.querySelectorAll(cardSel + ':not(.drop-indicator)')]; }
 
-  function createGhost(card, x, y) {
+  function createGhost(card, y) {
+    const r = card.getBoundingClientRect();
+    ghostOffY = y - r.top;
     ghost = card.cloneNode(true);
     ghost.className = 'drag-ghost';
-    ghost.style.width = card.offsetWidth + 'px';
-    ghost.style.left = x - card.offsetWidth / 2 + 'px';
-    ghost.style.top = y - card.offsetHeight / 2 + 'px';
+    ghost.style.width = r.width + 'px';
+    ghost.style.left = r.left + 'px';
+    ghost.style.top = (y - ghostOffY) + 'px';
     document.body.appendChild(ghost);
+    listRect = listEl.getBoundingClientRect();
   }
 
-  function moveGhost(x, y) {
+  function moveGhost(y) {
     if (!ghost) return;
-    ghost.style.left = x - ghost.offsetWidth / 2 + 'px';
-    ghost.style.top = y - ghost.offsetHeight / 2 + 'px';
+    ghost.style.top = (y - ghostOffY) + 'px';
   }
 
   function removeGhost() {
@@ -1030,7 +1033,6 @@ function initListDrag(listEl, cardSel, handleSel, onReorder) {
       const rect = cards[i].getBoundingClientRect();
       if (y < rect.top + rect.height / 2) { insertIdx = i; break; }
     }
-    // Don't show indicator at source position or source+1
     if (insertIdx === srcIdx || insertIdx === srcIdx + 1) { curIdx = -1; return; }
     curIdx = insertIdx;
     indicator = document.createElement('div');
@@ -1046,6 +1048,8 @@ function initListDrag(listEl, cardSel, handleSel, onReorder) {
     if (srcCard) srcCard.classList.remove('dragging-source');
     removeGhost();
     removeIndicator();
+    document.body.style.userSelect = '';
+    document.body.style.webkitUserSelect = '';
     if (srcIdx >= 0 && curIdx >= 0 && curIdx !== srcIdx && curIdx !== srcIdx + 1) {
       const toIdx = curIdx > srcIdx ? curIdx - 1 : curIdx;
       onReorder(srcIdx, toIdx);
@@ -1053,67 +1057,61 @@ function initListDrag(listEl, cardSel, handleSel, onReorder) {
     srcCard = null; srcIdx = -1; curIdx = -1;
   }
 
-  // ── Mouse events ──
+  function startDrag(card, y) {
+    srcCard = card;
+    srcIdx = getCards().indexOf(card);
+    card.classList.add('dragging-source');
+    createGhost(card, y);
+    document.body.style.userSelect = 'none';
+    document.body.style.webkitUserSelect = 'none';
+  }
+
+  // ── Mouse ──
   listEl.addEventListener('mousedown', e => {
     const handle = e.target.closest(handleSel);
     if (!handle) return;
     const card = handle.closest(cardSel);
     if (!card || !listEl.contains(card)) return;
     e.preventDefault();
-    srcCard = card;
-    srcIdx = getCards().indexOf(card);
-    card.classList.add('dragging-source');
-    createGhost(card, e.clientX, e.clientY);
-
-    const onMove = ev => {
-      ev.preventDefault();
-      moveGhost(ev.clientX, ev.clientY);
-      showIndicator(getCards(), ev.clientY);
-    };
-    const onUp = ev => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      finishDrag();
-    };
+    startDrag(card, e.clientY);
+    const onMove = ev => { ev.preventDefault(); moveGhost(ev.clientY); showIndicator(getCards(), ev.clientY); };
+    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); finishDrag(); };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
 
-  // ── Touch events ──
+  // ── Touch ──
   listEl.addEventListener('touchstart', e => {
     const handle = e.target.closest(handleSel);
     if (!handle) return;
     const card = handle.closest(cardSel);
     if (!card || !listEl.contains(card)) return;
-    srcCard = card;
-    srcIdx = getCards().indexOf(card);
-    const touch = e.touches[0];
-
+    const t0 = e.touches[0];
     let moved = false;
     const onMove = ev => {
-      ev.preventDefault();
       const t = ev.touches[0];
       if (!moved) {
+        if (Math.abs(t.clientY - t0.clientY) < 5) return;
         moved = true;
-        card.classList.add('dragging-source');
-        createGhost(card, t.clientX, t.clientY);
+        ev.preventDefault();
+        startDrag(card, t.clientY);
+      } else {
+        ev.preventDefault();
       }
-      moveGhost(t.clientX, t.clientY);
+      moveGhost(t.clientY);
       showIndicator(getCards(), t.clientY);
     };
-    const onEnd = ev => {
-      listEl.removeEventListener('touchmove', onMove);
-      listEl.removeEventListener('touchend', onEnd);
-      listEl.removeEventListener('touchcancel', onEnd);
-      finishDrag();
+    const onEnd = () => {
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
+      document.removeEventListener('touchcancel', onEnd);
+      if (moved) finishDrag();
+      else { srcCard = null; srcIdx = -1; }
     };
-    listEl.addEventListener('touchmove', onMove, { passive: false });
-    listEl.addEventListener('touchend', onEnd);
-    listEl.addEventListener('touchcancel', onEnd);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd);
+    document.addEventListener('touchcancel', onEnd);
   }, { passive: true });
-
-  // Disable native drag
-  listEl.querySelectorAll(cardSel).forEach(c => c.setAttribute('draggable', 'false'));
 }
 
 function buildHome() {
