@@ -307,7 +307,7 @@
     font-size: 1.4rem;
     color: var(--text-muted);
     cursor: grab;
-    padding: 8px 4px 8px 12px;
+    padding: 8px 12px 8px 4px;
     flex-shrink: 0;
     user-select: none;
     touch-action: none;
@@ -1236,12 +1236,12 @@ function buildHome() {
       const ruleCount = part.rules.length;
       const sitCount = part.rules.reduce((n,r) => n + (DB.situations[r]?.length||0), 0);
       html += `<div class="home-part-card" data-part="${part.number}" onclick="openPartRules('${part.number}')">
+        <div class="home-part-drag" title="Järjestä">⠿</div>
         <div class="home-part-icon">${icons[idx]||'📄'}</div>
         <div class="home-part-info">
           <div class="home-part-name" style="display:flex;align-items:baseline;gap:8px;"><span style="flex:1;">${part.title}</span><span style="font-size:0.72rem;font-weight:400;color:var(--text-muted);white-space:nowrap;">OSA ${part.number}</span></div>
           <div class="home-part-meta">${ruleCount} sääntöä · ${sitCount} tilannetta</div>
         </div>
-        <div class="home-part-drag" title="Järjestä">⠿</div>
       </div>`;
     });
     container.innerHTML = html;
