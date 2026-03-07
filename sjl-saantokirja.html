@@ -1187,6 +1187,7 @@ function buildHome() {
       }
       if (!title) return;
       html += `<div class="home-part-card" data-fav="${favId}" onclick="${clickFn}" style="padding:10px 14px;">
+        <div class="home-part-drag" title="Järjestä">⠿</div>
         <div class="home-part-icon" style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#D4A843 0%,#b8912e 100%);">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7L12 2z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>
         </div>
@@ -1194,7 +1195,7 @@ function buildHome() {
           <div class="home-part-name" style="font-size:0.8rem;">${title}</div>
           <div class="home-part-meta">${badge}</div>
         </div>
-        <button class="fav-star-btn active" data-fav="${favId}" onclick="toggleFavorite('${favId}',event)" title="Poista suosikeista">
+        <button type="button" class="fav-star-btn active" data-fav="${favId}" onclick="event.stopPropagation();toggleFavorite('${favId}',event)" title="Poista suosikeista">
           <svg class="star-filled" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7L12 2z" fill="#D4A843" stroke="#D4A843" stroke-width="1.5" stroke-linejoin="round"/></svg>
           <svg class="star-outline" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7L12 2z" stroke="#b8cce0" stroke-width="1.5" stroke-linejoin="round" fill="none"/></svg>
         </button>
@@ -1207,7 +1208,7 @@ function buildHome() {
 
   function setupFavDragDrop() {
     const favContainer = document.getElementById('fav-items');
-    initListDrag(favContainer, '.home-part-card', '.fav-star-btn,.home-part-icon', function(fromIdx, toIdx) {
+    initListDrag(favContainer, '.home-part-card', '.home-part-drag', function(fromIdx, toIdx) {
       favOrder.splice(toIdx, 0, favOrder.splice(fromIdx, 1)[0]);
       localStorage.setItem('sjl_fav_order', JSON.stringify(favOrder));
       renderFavorites();
@@ -1216,7 +1217,7 @@ function buildHome() {
 
   window.favStarHTML = function(favId) {
     const isActive = favorites.includes(favId);
-    return `<button class="fav-star-btn ${isActive ? 'active' : ''}" data-fav="${favId}" onclick="toggleFavorite('${favId}',event)" title="${isActive ? 'Poista suosikeista' : 'Lisää suosikiksi'}">
+    return `<button type="button" class="fav-star-btn ${isActive ? 'active' : ''}" data-fav="${favId}" onclick="event.stopPropagation();toggleFavorite('${favId}',event)" title="${isActive ? 'Poista suosikeista' : 'Lisää suosikiksi'}">
       <svg class="star-filled" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7L12 2z" fill="#D4A843" stroke="#D4A843" stroke-width="1.5" stroke-linejoin="round"/></svg>
       <svg class="star-outline" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7L12 2z" stroke="#b8cce0" stroke-width="1.5" stroke-linejoin="round" fill="none"/></svg>
     </button>`;
