@@ -1012,6 +1012,8 @@ function togglePart(num) {
 function initListDrag(listEl, cardSel, handleSel, onReorder) {
   let srcCard = null, ghost = null, indicator = null, srcIdx = -1, curIdx = -1;
   let ghostOffY = 0, listRect = null;
+  const ac = new AbortController();
+  const sig = ac.signal;
 
   function getCards() { return [...listEl.querySelectorAll(cardSel + ':not(.drop-indicator)')]; }
 
@@ -1092,7 +1094,7 @@ function initListDrag(listEl, cardSel, handleSel, onReorder) {
     const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); finishDrag(); };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  });
+  }, { signal: sig });
 
   // ── Touch ──
   listEl.addEventListener('touchstart', e => {
@@ -1102,6 +1104,11 @@ function initListDrag(listEl, cardSel, handleSel, onReorder) {
     if (!card || !listEl.contains(card)) return;
     const t0 = e.touches[0];
     let moved = false;
+    const cleanup = () => {
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
+      document.removeEventListener('touchcancel', onEnd);
+    };
     const onMove = ev => {
       const t = ev.touches[0];
       if (!moved) {
@@ -1116,16 +1123,24 @@ function initListDrag(listEl, cardSel, handleSel, onReorder) {
       showIndicator(getCards(), t.clientY);
     };
     const onEnd = () => {
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('touchend', onEnd);
-      document.removeEventListener('touchcancel', onEnd);
-      if (moved) finishDrag();
-      else { srcCard = null; srcIdx = -1; }
+      cleanup();
+      if (moved) {
+        finishDrag();
+      } else {
+        if (srcCard) srcCard.classList.remove('dragging-source');
+        removeGhost();
+        removeIndicator();
+        document.body.style.userSelect = '';
+        document.body.style.webkitUserSelect = '';
+        srcCard = null; srcIdx = -1; curIdx = -1;
+      }
     };
     document.addEventListener('touchmove', onMove, { passive: false });
     document.addEventListener('touchend', onEnd);
     document.addEventListener('touchcancel', onEnd);
-  }, { passive: true });
+  }, { passive: true, signal: sig });
+
+  return function destroy() { ac.abort(); };
 }
 
 function buildHome() {
@@ -1206,9 +1221,11 @@ function buildHome() {
     setupFavDragDrop();
   };
 
+  let _destroyFavDrag = null;
   function setupFavDragDrop() {
+    if (_destroyFavDrag) _destroyFavDrag();
     const favContainer = document.getElementById('fav-items');
-    initListDrag(favContainer, '.home-part-card', '.home-part-drag', function(fromIdx, toIdx) {
+    _destroyFavDrag = initListDrag(favContainer, '.home-part-card', '.home-part-drag', function(fromIdx, toIdx) {
       favOrder.splice(toIdx, 0, favOrder.splice(fromIdx, 1)[0]);
       localStorage.setItem('sjl_fav_order', JSON.stringify(favOrder));
       renderFavorites();
