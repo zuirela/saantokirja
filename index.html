@@ -1649,6 +1649,19 @@ function openRule(ruleNum) {
   if (window.innerWidth < 768) closeSidebar();
 }
 
+function highlightInSection(el, query) {
+  if (!query || query.length < 2) return;
+  const contentEl = el.querySelector('.section-content');
+  if (!contentEl) return;
+  const origHTML = contentEl.innerHTML;
+  const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp('(' + q + ')', 'gi');
+  contentEl.innerHTML = origHTML.replace(regex, '<mark style="background:#ffe066;padding:2px 4px;border-radius:3px;font-weight:bold;">$1</mark>');
+  const mark = contentEl.querySelector('mark');
+  if (mark) mark.scrollIntoView({behavior:'smooth',block:'center'});
+  setTimeout(() => { if (contentEl) contentEl.innerHTML = origHTML; }, 8000);
+}
+
 function toggleSection(id) {
   const el = document.getElementById('sec-' + id.replace('_','.'));
   if (el) el.classList.toggle('expanded');
@@ -1749,7 +1762,7 @@ function performSearch(query) {
       const snip = highlightText(m.snippet, q);
       const secId = m.secId;
       const badgeLabel = secId ? `Sääntö ${secId}` : `Sääntö ${r.number}`;
-      const scrollSec = secId ? ` setTimeout(()=>{ const el=document.getElementById('sec-${secId.replace('.','_')}'); if(el){el.scrollIntoView({behavior:'smooth',block:'start'});} },300);` : '';
+      const scrollSec = secId ? ` setTimeout(()=>{ const el=document.getElementById('sec-${secId}'); if(el){el.classList.add('expanded'); el.scrollIntoView({behavior:'smooth',block:'start'}); highlightInSection(el,'${q.replace(/'/g,"\\'")}');} },300);` : '';
       html += `<div class="search-result-item" onclick="openRule('${r.number}'); showView('rule');${scrollSec}">
         <div class="search-result-rule">
           <span class="search-result-badge">${badgeLabel}</span>
@@ -1924,7 +1937,7 @@ function performHomeSearch(query) {
       const snip = highlightText(m.snippet, q);
       const secId = m.secId;
       const badgeLabel = secId ? `Sääntö ${secId}` : `Sääntö ${r.number}`;
-      const scrollSec = secId ? ` setTimeout(()=>{ const el=document.getElementById('sec-${secId.replace('.','_')}'); if(el){el.scrollIntoView({behavior:'smooth',block:'start'});} },300);` : '';
+      const scrollSec = secId ? ` setTimeout(()=>{ const el=document.getElementById('sec-${secId}'); if(el){el.classList.add('expanded'); el.scrollIntoView({behavior:'smooth',block:'start'}); highlightInSection(el,'${q.replace(/'/g,"\\'")}');} },300);` : '';
       html += `<div class="search-result-item" onclick="openRule('${r.number}'); showView('rule');${scrollSec}">
         <div class="search-result-rule">
           <span class="search-result-badge">${badgeLabel}</span>
