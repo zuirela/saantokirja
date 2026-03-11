@@ -1649,17 +1649,60 @@ function openRule(ruleNum) {
   if (window.innerWidth < 768) closeSidebar();
 }
 
-function highlightInSection(el, query) {
-  if (!query || query.length < 2) return;
-  const contentEl = el.querySelector('.section-content');
-  if (!contentEl) return;
-  const origHTML = contentEl.innerHTML;
-  const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp('(' + q + ')', 'gi');
-  contentEl.innerHTML = origHTML.replace(regex, '<mark style="background:#ffe066;padding:2px 4px;border-radius:3px;font-weight:bold;">$1</mark>');
-  const mark = contentEl.querySelector('mark');
-  if (mark) mark.scrollIntoView({behavior:'smooth',block:'center'});
-  setTimeout(() => { if (contentEl) contentEl.innerHTML = origHTML; }, 8000);
+function openRuleAndHighlight(ruleNum, secId, query) {
+  openRule(ruleNum);
+  setView('rule');
+  if (!secId) return;
+  setTimeout(() => {
+    const el = document.getElementById('sec-' + secId);
+    if (!el) { alert('Element not found: sec-' + secId); return; }
+    el.classList.add('expanded');
+    requestAnimationFrame(() => {
+      const contentEl = el.querySelector('.section-content');
+      if (contentEl && query && query.length >= 2) {
+        const origHTML = contentEl.innerHTML;
+        const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp('(' + q + ')', 'gi');
+        const newHTML = origHTML.replace(regex, '<mark style="background:#ffe066;padding:2px 4px;border-radius:3px;font-weight:bold;">$1</mark>');
+        if (newHTML === origHTML) { alert('No match found for: ' + query + ' in content length ' + origHTML.length); }
+        contentEl.innerHTML = newHTML;
+        const mark = contentEl.querySelector('mark');
+        if (mark) { const y = mark.getBoundingClientRect().top + window.scrollY - 80; window.scrollTo({top: y, behavior:'smooth'}); }
+        setTimeout(() => { contentEl.innerHTML = origHTML; }, 8000);
+      } else {
+        const y = el.getBoundingClientRect().top + window.scrollY - 80;
+        window.scrollTo({top: y, behavior:'smooth'});
+      }
+    });
+  }, 350);
+}
+
+function openSitAndHighlight(ruleNum, sitId, query) {
+  openRule(ruleNum);
+  setView('rule');
+  if (!sitId) return;
+  setTimeout(() => {
+    const el = document.getElementById('sit-' + sitId.replace(/\./g,'_'));
+    if (!el) return;
+    el.classList.add('expanded');
+    requestAnimationFrame(() => {
+      if (query && query.length >= 2) {
+        const ansEl = el.querySelector('.situation-answer');
+        const qEl = el.querySelector('.situation-q-text');
+        [qEl, ansEl].forEach(target => {
+          if (!target) return;
+          const origHTML = target.innerHTML;
+          const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp('(' + q + ')', 'gi');
+          const newHTML = origHTML.replace(regex, '<mark style="background:#ffe066;padding:2px 4px;border-radius:3px;font-weight:bold;">$1</mark>');
+          if (newHTML !== origHTML) target.innerHTML = newHTML;
+          setTimeout(() => { target.innerHTML = origHTML; }, 8000);
+        });
+      }
+      const y = el.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({top: y, behavior:'smooth'});
+    });
+  }, 350);
 }
 
 function toggleSection(id) {
@@ -1762,8 +1805,8 @@ function performSearch(query) {
       const snip = highlightText(m.snippet, q);
       const secId = m.secId;
       const badgeLabel = secId ? `Sääntö ${secId}` : `Sääntö ${r.number}`;
-      const scrollSec = secId ? ` setTimeout(()=>{ const el=document.getElementById('sec-${secId}'); if(el){el.classList.add('expanded'); el.scrollIntoView({behavior:'smooth',block:'start'}); highlightInSection(el,'${q.replace(/'/g,"\\'")}');} },300);` : '';
-      html += `<div class="search-result-item" onclick="openRule('${r.number}'); showView('rule');${scrollSec}">
+      const safeQ = q.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      html += `<div class="search-result-item" onclick="openRuleAndHighlight('${r.number}','${secId||''}','${safeQ}')">
         <div class="search-result-rule">
           <span class="search-result-badge">${badgeLabel}</span>
           <span class="search-result-title">${highlightText(r.title, q)}</span>
@@ -1774,7 +1817,8 @@ function performSearch(query) {
       const sit = m.sit;
       const rule = DB.rules[sit.rule_number];
       const snip = highlightText(m.snippet, q);
-      html += `<div class="search-result-item" onclick="openRule('${sit.rule_number}'); showView('rule'); setTimeout(()=>{ const el=document.getElementById('sit-${sit.id.replace('.','_')}'); if(el){el.classList.add('expanded'); el.scrollIntoView({behavior:'smooth',block:'start'});} },300);">
+      const sitSafeQ = q.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      html += `<div class="search-result-item" onclick="openSitAndHighlight('${sit.rule_number}','${sit.id}','${sitSafeQ}')">
         <div class="search-result-rule">
           <span class="search-result-badge situation">Tilanne ${sit.id}</span>
           <span class="search-result-title">${rule ? rule.title : ''}</span>
@@ -1937,8 +1981,8 @@ function performHomeSearch(query) {
       const snip = highlightText(m.snippet, q);
       const secId = m.secId;
       const badgeLabel = secId ? `Sääntö ${secId}` : `Sääntö ${r.number}`;
-      const scrollSec = secId ? ` setTimeout(()=>{ const el=document.getElementById('sec-${secId}'); if(el){el.classList.add('expanded'); el.scrollIntoView({behavior:'smooth',block:'start'}); highlightInSection(el,'${q.replace(/'/g,"\\'")}');} },300);` : '';
-      html += `<div class="search-result-item" onclick="openRule('${r.number}'); showView('rule');${scrollSec}">
+      const safeQ = q.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      html += `<div class="search-result-item" onclick="openRuleAndHighlight('${r.number}','${secId||''}','${safeQ}')">
         <div class="search-result-rule">
           <span class="search-result-badge">${badgeLabel}</span>
           <span class="search-result-title">${highlightText(r.title, q)}</span>
@@ -1949,7 +1993,8 @@ function performHomeSearch(query) {
       const sit = m.sit;
       const rule = DB.rules[sit.rule_number];
       const snip = highlightText(m.snippet, q);
-      html += `<div class="search-result-item" onclick="openRule('${sit.rule_number}'); showView('rule'); setTimeout(()=>{ const el=document.getElementById('sit-${sit.id.replace('.','_')}'); if(el){el.classList.add('expanded'); el.scrollIntoView({behavior:'smooth',block:'start'});} },300);">
+      const sitSafeQ = q.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      html += `<div class="search-result-item" onclick="openSitAndHighlight('${sit.rule_number}','${sit.id}','${sitSafeQ}')">
         <div class="search-result-rule">
           <span class="search-result-badge situation">Tilanne ${sit.id}</span>
           <span class="search-result-title">${rule ? rule.title : ''}</span>
